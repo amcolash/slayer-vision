@@ -28,6 +28,11 @@ def find(img_gray, draw_img, templates, threshold = 0.75):
 
   return found
 
+show_stats = True
+def stats(draw_img, text, y):
+  if show_stats:
+    cv2.putText(draw_img, text, (w - 140, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+
 fullW = 2280
 fullH = 1080
 
@@ -59,6 +64,7 @@ orange_block = resize('images/orange_block.png')
 bee = resize('images/bee_1.png')
 boost_img = resize('images/boost.png')
 bonus_img = resize('images/bonus.png')
+buy_all_img = resize('images/buy_all.png')
 
 boost_timeout = time.time() - 15
 bonus_count = 0
@@ -77,7 +83,7 @@ with mss() as sct:
     draw_img = img_rgb.copy()
 
     screenshot = 'screen ' + str(round((time.time() - screenshot) * 1000, 2))
-    image = cv2.putText(draw_img, screenshot, (w - 140, h - 215), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, screenshot, h - 215)
 
     # TODO: make thresholds relative to scale
     coin_thresh_x_left = 60
@@ -89,25 +95,25 @@ with mss() as sct:
     cv2.line(draw_img, (0, coin_thresh_y), (w, coin_thresh_y), (0,0,255), 2)
 
     search_w = max(350, coin_thresh_x_boost)
-    search_h = 250
+    search_h = 230
     search_region = img_rgb[0:search_h, 0:search_w]
     img_gray_region = cv2.cvtColor(search_region.copy(), cv2.COLOR_BGR2GRAY)
     cv2.rectangle(draw_img, (0, 0), (search_w, search_h), (255,0,0), 2)
 
     find_coins = time.time()
-    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.5)
+    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.45)
     find_coins = 'coins ' + str(round((time.time() - find_coins) * 1000, 2))
-    image = cv2.putText(draw_img, find_coins, (w - 140, h - 200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, find_coins, h - 200)
 
     find_blocks = time.time()
     block = find(img_gray_region, draw_img, [orange_block])
     find_blocks = 'blocks ' + str(round((time.time() - find_blocks) * 1000, 2))
-    image = cv2.putText(draw_img, find_blocks, (w - 140, h - 185), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, find_blocks, h - 185)
 
     find_enemies = time.time()
     enemies = find(img_gray_region, draw_img, [bee], 0.5)
     find_enemies = 'enemies ' + str(round((time.time() - find_enemies) * 1000, 2))
-    image = cv2.putText(draw_img, find_enemies, (w - 140, h - 170), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, find_enemies, h - 170)
 
     logic = time.time()
 
@@ -162,10 +168,10 @@ with mss() as sct:
         subprocess.Popen(f"xdotool mousemove {str(int(x + (b[0][0] + b[1][0]) / 2))} {str(int(y + (b[0][1] + b[1][1]) / 2))} click 1", shell=True)
 
     logic = 'logic ' + str(round((time.time() - logic) * 1000, 2))
-    image = cv2.putText(draw_img, logic, (w - 140, h - 155), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, logic, h - 155)
 
     fps = 'fps ' + str(round(1 / (time.time() - frame), 2))
-    image = cv2.putText(draw_img, fps, (w - 140, h - 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats(draw_img, fps, h - 250)
 
     cv2.imshow(title, draw_img)
 
