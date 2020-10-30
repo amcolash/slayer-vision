@@ -17,13 +17,13 @@ def resize(f):
 def find(img_gray, draw_img, templates, threshold = 0.75):
   found = []
 
-  for template in templates:
+  for i, template in enumerate(templates):
     w, h = template.shape[::-1]
     res = cv2.matchTemplate(img_gray,template,cv2.TM_CCOEFF_NORMED)
     loc = np.where( res >= threshold)
     for pt in zip(*loc[::-1]):
       point = [pt, (pt[0] + w, pt[1] + h)]
-      cv2.rectangle(draw_img, point[0], point[1], (0,0,255), 2)
+      cv2.rectangle(draw_img, point[0], point[1], (0, 0, 255), 1)
       found.append(point)
 
   return found
@@ -69,6 +69,9 @@ buy_all_img = resize('images/buy_all.png')
 boost_timeout = time.time() - 15
 bonus_count = 0
 
+jump_delay = 1
+jump_timeout = 0
+
 title = "frame"
 cv2.namedWindow(title)
 cv2.moveWindow(title, x - 10, 70)
@@ -85,14 +88,22 @@ with mss() as sct:
     screenshot = 'screen ' + str(round((time.time() - screenshot) * 1000, 2))
     stats(draw_img, screenshot, h - 215)
 
+    # debug how fast screenshots by themselves are
+    # fps = 'fps ' + str(round(1 / (time.time() - frame), 2))
+    # stats(draw_img, fps, h - 250)
+    # cv2.imshow(title, draw_img)
+    # if cv2.waitKey(1) & 0xFF == ord('q'):
+    #   break
+    # continue
+
     # TODO: make thresholds relative to scale
     coin_thresh_x_left = 60
     coin_thresh_x_right = 180
-    coin_thresh_x_boost = int(coin_thresh_x_right + 250 * (1 - (time.time() - boost_timeout) / 10))
+    coin_thresh_x_boost = int(coin_thresh_x_right + 300 * (1 - (time.time() - boost_timeout) / 10))
     coin_thresh_y = 175
-    cv2.line(draw_img, (coin_thresh_x_left, 0), (coin_thresh_x_left, h), (0,0,255), 2)
-    cv2.line(draw_img, (coin_thresh_x_right, 0), (coin_thresh_x_right, h), (0,0,255), 2)
-    cv2.line(draw_img, (0, coin_thresh_y), (w, coin_thresh_y), (0,0,255), 2)
+    cv2.line(draw_img, (coin_thresh_x_left, 0), (coin_thresh_x_left, h), (0,0,255), 1)
+    cv2.line(draw_img, (coin_thresh_x_right, 0), (coin_thresh_x_right, h), (0,0,255), 1)
+    cv2.line(draw_img, (0, coin_thresh_y), (w, coin_thresh_y), (0,0,255), 1)
 
     search_w = max(350, coin_thresh_x_boost)
     search_h = 230
@@ -101,7 +112,7 @@ with mss() as sct:
     cv2.rectangle(draw_img, (0, 0), (search_w, search_h), (255,0,0), 2)
 
     find_coins = time.time()
-    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.45)
+    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.5)
     find_coins = 'coins ' + str(round((time.time() - find_coins) * 1000, 2))
     stats(draw_img, find_coins, h - 200)
 
@@ -119,7 +130,7 @@ with mss() as sct:
 
     should_jump = False
     is_boost = time.time() - boost_timeout < 10
-    boost_enabled = time.time() - boost_timeout >= 14
+    boost_enabled = time.time() - boost_timeout >= 12
 
     for c in coins:
       if c[0][0] > coin_thresh_x_left and c[0][1] < coin_thresh_y:
@@ -141,7 +152,8 @@ with mss() as sct:
         cv2.rectangle(draw_img, b[0], b[1], (255,0,0), 2)
         should_jump = True
 
-    if should_jump:
+    if should_jump and time.time() > (jump_timeout + jump_delay):
+      jump_timeout = time.time()
       subprocess.Popen(f"xdotool mousemove {str(int(x + w / 2))} {str(int(y + h / 2))} mousedown 1 sleep 0.15 mouseup 1", shell=True)
 
     if is_boost:
@@ -149,7 +161,7 @@ with mss() as sct:
 
     # TODO: make this work better since coins reduce cooldown
     # only boost when there is not a frenzy
-    if len(coins) < 10 and boost_enabled:
+    if len(coins) < 8 and boost_enabled:
       boost = find(img_gray, draw_img, [boost_img], 0.65)
 
       if len(boost) > 0:
