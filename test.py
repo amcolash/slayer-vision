@@ -14,7 +14,7 @@ def resize(f):
   img = cv2.imread(f, 0)
   return cv2.resize(img, (int(img.shape[1] * scale), int(img.shape[0] * scale)))
 
-def find(img_gray, draw_img, templates, threshold = 0.75):
+def find(img_gray, draw_img, templates, threshold = 0.75, x = 0, y = 0):
   found = []
 
   for i, template in enumerate(templates):
@@ -22,16 +22,19 @@ def find(img_gray, draw_img, templates, threshold = 0.75):
     res = cv2.matchTemplate(img_gray,template,cv2.TM_CCOEFF_NORMED)
     loc = np.where( res >= threshold)
     for pt in zip(*loc[::-1]):
-      point = [pt, (pt[0] + w, pt[1] + h)]
-      cv2.rectangle(draw_img, point[0], point[1], (0, 0, 255), 1)
+      point = [(pt[0] + x, pt[1] + y), (pt[0] + w + x, pt[1] + h + y)]
+      cv2.rectangle(draw_img, point[0], point[1], (0, 0, 255), 2)
       found.append(point)
 
   return found
 
 show_stats = True
-def stats(draw_img, text, y):
+stats_offset = 0
+def stats(draw_img, text):
+  global show_stats, stats_offset
   if show_stats:
-    cv2.putText(draw_img, text, (w - 140, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    cv2.putText(draw_img, text, (w - 140, stats_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,255,0), 2)
+    stats_offset += 15
 
 fullW = 2280
 fullH = 1080
@@ -56,6 +59,8 @@ monitor = {"top": y, "left": x, "width": w, "height": h}
 
 # scale and load test images
 scale = ((w / fullW) + (h / fullH)) / 2
+
+print("scale is " + str(scale))
 
 coin1 = resize('images/coin_1.png')
 coin2 = resize('images/coin_2.png')
@@ -85,12 +90,15 @@ with mss() as sct:
     img_gray = cv2.cvtColor(img_rgb.copy(), cv2.COLOR_BGR2GRAY)
     draw_img = img_rgb.copy()
 
+    stats_offset = 40
+    cv2.rectangle(draw_img, (w - 150, 20), (w - 10, 150), (30,30,30), -1)
+
     screenshot = 'screen ' + str(round((time.time() - screenshot) * 1000, 2))
-    stats(draw_img, screenshot, h - 215)
+    stats(draw_img, screenshot)
 
     # debug how fast screenshots by themselves are
     # fps = 'fps ' + str(round(1 / (time.time() - frame), 2))
-    # stats(draw_img, fps, h - 250)
+    # stats(draw_img, fps)
     # cv2.imshow(title, draw_img)
     # if cv2.waitKey(1) & 0xFF == ord('q'):
     #   break
@@ -105,26 +113,27 @@ with mss() as sct:
     cv2.line(draw_img, (coin_thresh_x_right, 0), (coin_thresh_x_right, h), (0,0,255), 1)
     cv2.line(draw_img, (0, coin_thresh_y), (w, coin_thresh_y), (0,0,255), 1)
 
-    search_w = max(350, coin_thresh_x_boost)
+    search_w = max(250, coin_thresh_x_boost)
     search_h = 230
-    search_region = img_rgb[0:search_h, 0:search_w]
+    search_offset = 50
+    search_region = img_rgb[search_offset:search_h, search_offset:search_w]
     img_gray_region = cv2.cvtColor(search_region.copy(), cv2.COLOR_BGR2GRAY)
-    cv2.rectangle(draw_img, (0, 0), (search_w, search_h), (255,0,0), 2)
+    cv2.rectangle(draw_img, (search_offset, search_offset), (search_w, search_h), (255,0,0), 2)
 
     find_coins = time.time()
-    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.5)
+    coins = find(img_gray_region, draw_img, [coin1, coin2, ruby], 0.45, search_offset, search_offset)
     find_coins = 'coins ' + str(round((time.time() - find_coins) * 1000, 2))
-    stats(draw_img, find_coins, h - 200)
+    stats(draw_img, find_coins)
 
     find_blocks = time.time()
-    block = find(img_gray_region, draw_img, [orange_block])
+    block = find(img_gray_region, draw_img, [orange_block], x=search_offset, y=search_offset)
     find_blocks = 'blocks ' + str(round((time.time() - find_blocks) * 1000, 2))
-    stats(draw_img, find_blocks, h - 185)
+    stats(draw_img, find_blocks)
 
-    find_enemies = time.time()
-    enemies = find(img_gray_region, draw_img, [bee], 0.5)
-    find_enemies = 'enemies ' + str(round((time.time() - find_enemies) * 1000, 2))
-    stats(draw_img, find_enemies, h - 170)
+    # find_enemies = time.time()
+    # enemies = find(img_gray_region, draw_img, [bee], 0.5, search_offset, search_offset)
+    # find_enemies = 'enemies ' + str(round((time.time() - find_enemies) * 1000, 2))
+    # stats(draw_img, find_enemies)
 
     logic = time.time()
 
@@ -138,11 +147,11 @@ with mss() as sct:
           cv2.rectangle(draw_img, c[0], c[1], (0,255,0), 2)
           should_jump = True
 
-    for e in enemies:
-      if e[0][0] > coin_thresh_x_left:
-        if (is_boost and e[0][0] < coin_thresh_x_boost) or e[0][0] < coin_thresh_x_right:
-          cv2.rectangle(draw_img, e[0], e[1], (0,255,0), 2)
-          should_jump = True
+    # for e in enemies:
+    #   if e[0][0] > coin_thresh_x_left:
+    #     if (is_boost and e[0][0] < coin_thresh_x_boost) or e[0][0] < coin_thresh_x_right:
+    #       cv2.rectangle(draw_img, e[0], e[1], (0,255,0), 2)
+    #       should_jump = True
 
     block_thresh = 100
     cv2.line(draw_img, (block_thresh, 0), (block_thresh, h), (0,0,255), 2)
@@ -162,11 +171,15 @@ with mss() as sct:
     # TODO: make this work better since coins reduce cooldown
     # only boost when there is not a frenzy
     if len(coins) < 8 and boost_enabled:
-      boost = find(img_gray, draw_img, [boost_img], 0.65)
+      boost_size = 150
+      boost_region = img_rgb[h - boost_size:h, 0:boost_size]
+      boost_gray_region = cv2.cvtColor(boost_region.copy(), cv2.COLOR_BGR2GRAY)
+      boost = find(boost_gray_region, draw_img, [boost_img], 0.65, y = h - boost_size)
 
       if len(boost) > 0:
         b = boost[0]
         subprocess.Popen(f"xdotool mousemove {str(int(x + (b[0][0] + b[1][0]) / 2))} {str(int(y + (b[0][1] + b[1][1]) / 2))} click 1", shell=True)
+        boost = find(boost_gray_region, draw_img, [boost_img], 0.65, y = h - boost_size)
         boost_timeout = time.time()
 
     # For now, just run the bonus and fail
@@ -180,10 +193,11 @@ with mss() as sct:
         subprocess.Popen(f"xdotool mousemove {str(int(x + (b[0][0] + b[1][0]) / 2))} {str(int(y + (b[0][1] + b[1][1]) / 2))} click 1", shell=True)
 
     logic = 'logic ' + str(round((time.time() - logic) * 1000, 2))
-    stats(draw_img, logic, h - 155)
+    stats(draw_img, logic)
 
     fps = 'fps ' + str(round(1 / (time.time() - frame), 2))
-    stats(draw_img, fps, h - 250)
+    stats(draw_img, '')
+    stats(draw_img, fps)
 
     cv2.imshow(title, draw_img)
 
