@@ -28,6 +28,14 @@ def find(img_gray, draw_img, templates, threshold = 0.75, x = 0, y = 0):
 
   return found
 
+click_time = 0
+click_point = (0,0)
+def click(x, y):
+  global click_point, click_time
+  click_point = (x, y)
+  click_time = time.time()
+  subprocess.Popen(f"xdotool mousemove {str(x)} {str(y)} mousedown 1 sleep 0.15 mouseup 1", shell=True)
+
 show_stats = True
 stats_offset = 0
 def stats(draw_img, text):
@@ -93,6 +101,9 @@ with mss() as sct:
     stats_offset = 40
     cv2.rectangle(draw_img, (w - 150, 20), (w - 10, 150), (30,30,30), -1)
 
+    if (time.time() < click_time + 0.25):
+      cv2.circle(draw_img, (click_point[0] - x, click_point[1] - y), 25, (255, 255, 0), -1)
+
     screenshot = 'screen ' + str(round((time.time() - screenshot) * 1000, 2))
     stats(draw_img, screenshot)
 
@@ -140,6 +151,7 @@ with mss() as sct:
     should_jump = False
     is_boost = time.time() - boost_timeout < 10
     boost_enabled = time.time() - boost_timeout >= 12
+    can_click = time.time() > click_time + 0.15
 
     for c in coins:
       if c[0][0] > coin_thresh_x_left and c[0][1] < coin_thresh_y:
@@ -161,9 +173,9 @@ with mss() as sct:
         cv2.rectangle(draw_img, b[0], b[1], (255,0,0), 2)
         should_jump = True
 
-    if should_jump and time.time() > (jump_timeout + jump_delay):
+    if should_jump and can_click and time.time() > (jump_timeout + jump_delay):
       jump_timeout = time.time()
-      subprocess.Popen(f"xdotool mousemove {str(int(x + w / 2))} {str(int(y + h / 2))} mousedown 1 sleep 0.15 mouseup 1", shell=True)
+      click(int(x + w / 2), int(y + h / 2))
 
     if is_boost:
       cv2.line(draw_img, (coin_thresh_x_boost, 0), (coin_thresh_x_boost, h), (0,0,255), 2)
@@ -176,9 +188,9 @@ with mss() as sct:
       boost_gray_region = cv2.cvtColor(boost_region.copy(), cv2.COLOR_BGR2GRAY)
       boost = find(boost_gray_region, draw_img, [boost_img], 0.65, y = h - boost_size)
 
-      if len(boost) > 0:
+      if len(boost) > 0 and can_click:
         b = boost[0]
-        subprocess.Popen(f"xdotool mousemove {str(int(x + (b[0][0] + b[1][0]) / 2))} {str(int(y + (b[0][1] + b[1][1]) / 2))} click 1", shell=True)
+        click(int(x + (b[0][0] + b[1][0]) / 2), int(y + (b[0][1] + b[1][1]) / 2))
         boost = find(boost_gray_region, draw_img, [boost_img], 0.65, y = h - boost_size)
         boost_timeout = time.time()
 
@@ -188,9 +200,9 @@ with mss() as sct:
       bonus_count = 0
       bonus = find(img_gray, draw_img, [bonus_img])
 
-      if len(bonus) > 0:
+      if len(bonus) > 0 and can_click:
         b = bonus[0]
-        subprocess.Popen(f"xdotool mousemove {str(int(x + (b[0][0] + b[1][0]) / 2))} {str(int(y + (b[0][1] + b[1][1]) / 2))} click 1", shell=True)
+        click(int(x + (b[0][0] + b[1][0]) / 2), int(y + (b[0][1] + b[1][1]) / 2))
 
     logic = 'logic ' + str(round((time.time() - logic) * 1000, 2))
     stats(draw_img, logic)
